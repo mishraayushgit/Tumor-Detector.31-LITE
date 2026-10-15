@@ -67,22 +67,8 @@ def predict_tumor(image_path):
     return result, label, confidence, probabilities
 
 
-# ── Routes ────────────────────────────────────────────────────────────────────
-@app.route("/", methods=["GET"])
-def health():
-    return jsonify({
-        "status": "online",
-        "service": "Tumor Detector Lite AI Backend",
-        "model": "ResNet50 TFLite (23.3 MB)",
-        "memory_optimized": True,
-        "endpoints": {
-            "detect": "POST /api/detect (form-data: 'file')"
-        }
-    })
-
-
-@app.route("/api/detect", methods=["POST"])
-def detect_api():
+# ── Detection Logic Handler ───────────────────────────────────────────────────
+def handle_detection():
     if "file" not in request.files:
         return jsonify({"error": "No file part in request"}), 400
 
@@ -105,6 +91,32 @@ def detect_api():
     except Exception as err:
         print("Inference error:", err)
         return jsonify({"error": str(err)}), 500
+
+
+# ── Routes ────────────────────────────────────────────────────────────────────
+# Root route supports both GET (health check) and POST (fallback detection)
+@app.route("/", methods=["GET", "POST"])
+def health_or_detect():
+    if request.method == "POST":
+        return handle_detection()
+
+    return jsonify({
+        "status": "online",
+        "service": "Tumor Detector Lite AI Backend",
+        "model": "ResNet50 TFLite (23.3 MB)",
+        "memory_optimized": True,
+        "endpoints": {
+            "detect": "POST /api/detect (form-data: 'file')"
+        }
+    })
+
+
+# Primary detection endpoint
+@app.route("/api/detect", methods=["POST", "OPTIONS"])
+def detect_api():
+    if request.method == "OPTIONS":
+        return jsonify({"status": "ok"}), 200
+    return handle_detection()
 
 
 if __name__ == "__main__":
